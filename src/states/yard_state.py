@@ -90,7 +90,7 @@ class YardState(BaseState):
         if self.photo_taken or self.raccoon_fled:
             return
         if event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 1:
+            if event.button == 1 and self._aiming:
                 self._take_photo()
             elif event.button == 3:
                 self._aiming = True
@@ -141,6 +141,21 @@ class YardState(BaseState):
 
         return photo
 
+    def _raccoon_in_lens(self, raccoon) -> bool:
+        """True if the raccoon circle is fully inside the ADS lens circle."""
+        mx, my = self.viewfinder.pos
+        yr = self._yard_rect
+        vp_w = int(yr.width / ADS_ZOOM)
+        vp_h = int(yr.height / ADS_ZOOM)
+        vp_x = int(max(yr.left, min(mx - vp_w // 2, yr.right - vp_w)))
+        vp_y = int(max(yr.top, min(my - vp_h // 2, yr.bottom - vp_h)))
+
+        rx, ry = raccoon.yard_pos
+        sx = yr.left + (rx - vp_x) * ADS_ZOOM
+        sy = yr.top + (ry - vp_y) * ADS_ZOOM
+        dist = ((sx - _LENS_CX) ** 2 + (sy - _LENS_CY) ** 2) ** 0.5
+        return dist + raccoon.radius * ADS_ZOOM <= _LENS_R
+
     def _take_photo(self):
         photo = self._capture_photo()
 
@@ -148,7 +163,7 @@ class YardState(BaseState):
         self.shutter_active = True
         self.shutter_elapsed = 0.0
 
-        caught = [r for r in self.raccoons if self.viewfinder.hit_test(r.yard_pos)]
+        caught = [r for r in self.raccoons if self._raccoon_in_lens(r)]
         self.result_score = sum(r.points for r in caught)
         self.game.score += self.result_score
         for r in caught:
@@ -205,6 +220,11 @@ class YardState(BaseState):
                                 min(r.yard_pos[1] + self._yard_vy[i] * dt, foreground_bot))
 
         self.viewfinder.update([r.yard_pos for r in self.raccoons] or None)
+        if self._aiming:
+            # In ADS mode, reticle turns green only when a raccoon is fully inside the lens
+            self.viewfinder.is_hit = bool(self.raccoons) and any(
+                self._raccoon_in_lens(r) for r in self.raccoons
+            )
 
         if self.time_remaining <= 0:
             self.time_remaining = 0
