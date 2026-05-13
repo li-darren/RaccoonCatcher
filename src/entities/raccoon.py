@@ -20,9 +20,20 @@ class Raccoon:
         self.move_timer: float = random.uniform(*self.move_range)
         self.yard_pos: list = [0, 0]
 
-        # Camera lateral wandering (normalized: 0=left edge, 1=right edge)
-        self.cam_x: float = random.uniform(0.2, 0.8)
-        self.cam_vx: float = random.choice([-1, 1]) * random.uniform(0.025, 0.07)
+        # Camera lateral wandering (normalized: 0=left edge, 1=right edge).
+        # 85% chance: spawn off-screen and walk slowly into view (~5-16 s).
+        if random.random() < 0.85:
+            if random.random() < 0.5:
+                self.cam_x = random.uniform(-0.25, -0.05)
+                self.cam_vx = random.uniform(0.015, 0.04)   # rightward slow entry
+            else:
+                self.cam_x = random.uniform(1.05, 1.25)
+                self.cam_vx = -random.uniform(0.015, 0.04)  # leftward slow entry
+            self._entering = True
+        else:
+            self.cam_x = random.uniform(0.2, 0.8)
+            self.cam_vx = random.choice([-1, 1]) * random.uniform(0.025, 0.07)
+            self._entering = False
         self.facing_right: bool = self.cam_vx >= 0
         self._dir_timer: float = random.uniform(3.0, 9.0)
 
@@ -33,14 +44,21 @@ class Raccoon:
         # Yard lateral speed (pixels/sec); direction set again in set_yard_position
         self.yard_vx: float = random.choice([-1, 1]) * random.uniform(25, 70)
 
+    @property
+    def is_camera_visible(self) -> bool:
+        """True when the raccoon is within the camera feed's visible area."""
+        return 0.0 <= self.cam_x <= 1.0
+
     def update(self, dt: float) -> bool:
         """Tick zone-hop timer. Zone change is animated via update_wander."""
-        self.move_timer -= dt
-        if self.move_timer <= 0 and not self._hopping:
-            available = [z for z in range(NUM_ZONES) if z != self.zone_index]
-            self._hop_target_zone = random.choice(available)
-            self._hopping = True
-            self.move_timer = random.uniform(*self.move_range)
+        # Don't allow zone hops while the raccoon is still walking on-screen.
+        if not self._entering:
+            self.move_timer -= dt
+            if self.move_timer <= 0 and not self._hopping:
+                available = [z for z in range(NUM_ZONES) if z != self.zone_index]
+                self._hop_target_zone = random.choice(available)
+                self._hopping = True
+                self.move_timer = random.uniform(*self.move_range)
         return False
 
     def update_wander(self, dt: float):
@@ -57,6 +75,7 @@ class Raccoon:
                 self.cam_x = -0.15
                 self.cam_vx = 0.05
                 self.facing_right = True
+                self._entering = True
             elif self.cam_x < -0.2:
                 self.zone_index = self._hop_target_zone
                 self._hopping = False
@@ -64,10 +83,20 @@ class Raccoon:
                 self.cam_x = 1.15
                 self.cam_vx = -0.05
                 self.facing_right = False
+                self._entering = True
             return
 
         self.cam_x += self.cam_vx * dt
-        # Bounce at the camera edges so raccoons stay visible when not hopping
+
+        if self._entering:
+            # Walk straight in; once fully on-screen switch to normal wander speed
+            if 0.0 <= self.cam_x <= 1.0:
+                self._entering = False
+                speed = random.uniform(0.025, 0.07)
+                self.cam_vx = speed if self.cam_vx >= 0 else -speed
+            return
+
+        # Normal bounce and direction-change logic
         if self.cam_x < 0.05:
             self.cam_vx = abs(self.cam_vx)
             self.facing_right = True

@@ -40,13 +40,14 @@ class CameraFeed:
         # 1. Yard background scaled to camera tile size
         screen.blit(self._get_bg(r), r.topleft)
 
-        # 3. Raccoon(s) — draw all raccoons in zone, scaled to fit tile
-        if raccoons_in_zone:
+        # 3. Raccoon(s) — only draw raccoons that are within the visible feed area
+        visible = [rc for rc in raccoons_in_zone if rc.is_camera_visible]
+        if visible:
             from src.ui.renderer import draw_raccoon
             scale = min(r.width / 1280, r.height / 660)
             ry = r.top + int(r.height * 0.65)
             screen.set_clip(r)
-            for raccoon in raccoons_in_zone:
+            for raccoon in visible:
                 rx = r.left + int(raccoon.cam_x * r.width)
                 scaled_r = max(int(raccoon.radius * scale), 3)
                 draw_raccoon(screen, (rx, ry), scaled_r, raccoon.size, raccoon.facing_right,
@@ -70,8 +71,8 @@ class CameraFeed:
         label = font.render(f"CAM {self.zone.index + 1}  {self.zone.name.upper()}", True, (0, 220, 0))
         screen.blit(label, (r.left + 6, r.top + 5))
 
-        # 8. Raccoon count badge + door button
-        self._draw_door_button(screen, len(raccoons_in_zone), door_hover)
+        # 8. Raccoon count badge + door button (only visible raccoons count)
+        self._draw_door_button(screen, len(visible), door_hover)
 
     def _draw_door_button(self, screen, raccoon_count: int, hover: bool):
         r = self.rect
