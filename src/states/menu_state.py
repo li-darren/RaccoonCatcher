@@ -52,17 +52,18 @@ class MenuState(BaseState):
         # How to play
         lines = [
             ("HOW TO PLAY", COL_GOLD, True),
-            ("Watch the security cameras to spot raccoons in your yard.", (160, 200, 160), False),
-            ("Click GO HERE! on a camera feed to rush out and photograph them.", (160, 200, 160), False),
-            ("Bigger raccoons = more points.  Don't dawdle — they run!", (160, 200, 160), False),
+            ("Watch the security cameras to spot raccoons, then click 'Open door to yard' to head outside.", (160, 200, 160), False),
+            ("Move your camera cursor over a raccoon and LEFT-CLICK to take the photo.", (160, 200, 160), False),
+            ("RIGHT-CLICK to raise the camera and zoom in 2.5× — easier to track the sneaky bandits.", (160, 200, 160), False),
+            ("Smaller raccoons are worth more points — but they're much harder to catch!", (160, 200, 160), False),
             ("Reach the score target before time runs out to clear each level.", (160, 200, 160), False),
         ]
-        y = 550
+        y = 548
         for text, color, bold in lines:
-            f = pygame.font.SysFont("Arial", 20, bold=bold)
+            f = pygame.font.SysFont("Arial", 19, bold=bold)
             s = f.render(text, True, color)
             screen.blit(s, s.get_rect(center=(SCREEN_WIDTH // 2, y)))
-            y += 30
+            y += 28
 
     def _draw_raccoon(self, screen, cx, cy, r):
         pygame.draw.circle(screen, (90, 90, 90), (cx, cy), r)
