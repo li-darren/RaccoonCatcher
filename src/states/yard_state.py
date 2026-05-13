@@ -102,17 +102,29 @@ class YardState(BaseState):
     # Photo capture helpers
     # ------------------------------------------------------------------
 
-    def _capture_photo(self):
-        """Return a Surface cropped to the ADS viewport around the cursor."""
+    def _ads_viewport(self) -> pygame.Rect:
+        """Compute the ADS viewport rect using a linear mouse-to-yard mapping.
+
+        Full mouse range maps to full panning range so every part of the yard
+        is reachable with no dead zones at screen edges.  The returned rect is
+        always clamped inside the yard (satisfies the user-facing constraint
+        that the viewfinder never exceeds the yard boundary).
+        """
         mx, my = pygame.mouse.get_pos()
         yr = self._yard_rect
-
         vp_w = int(yr.width / ADS_ZOOM)
         vp_h = int(yr.height / ADS_ZOOM)
+        tx = max(0.0, min(mx / max(SCREEN_WIDTH - 1, 1), 1.0))
+        ty = max(0.0, min((my - yr.top) / max(yr.height - 1, 1), 1.0))
+        vp_x = yr.left + int(tx * (yr.width - vp_w))
+        vp_y = yr.top + int(ty * (yr.height - vp_h))
+        return pygame.Rect(vp_x, vp_y, vp_w, vp_h)
 
-        vp_x = int(max(yr.left, min(mx - vp_w // 2, yr.right - vp_w)))
-        vp_y = int(max(yr.top, min(my - vp_h // 2, yr.bottom - vp_h)))
-        vp_rect = pygame.Rect(vp_x, vp_y, vp_w, vp_h)
+    def _capture_photo(self):
+        """Return a Surface cropped to the ADS viewport around the cursor."""
+        yr = self._yard_rect
+        vp_rect = self._ads_viewport()
+        vp_w, vp_h = vp_rect.w, vp_rect.h
 
         try:
             region = self._yard_surf.subsurface(vp_rect)
@@ -143,16 +155,11 @@ class YardState(BaseState):
 
     def _raccoon_in_lens(self, raccoon) -> bool:
         """True if the raccoon circle is fully inside the ADS lens circle."""
-        mx, my = self.viewfinder.pos
         yr = self._yard_rect
-        vp_w = int(yr.width / ADS_ZOOM)
-        vp_h = int(yr.height / ADS_ZOOM)
-        vp_x = int(max(yr.left, min(mx - vp_w // 2, yr.right - vp_w)))
-        vp_y = int(max(yr.top, min(my - vp_h // 2, yr.bottom - vp_h)))
-
+        vp_rect = self._ads_viewport()
         rx, ry = raccoon.yard_pos
-        sx = yr.left + (rx - vp_x) * ADS_ZOOM
-        sy = yr.top + (ry - vp_y) * ADS_ZOOM
+        sx = yr.left + (rx - vp_rect.x) * ADS_ZOOM
+        sy = yr.top + (ry - vp_rect.y) * ADS_ZOOM
         dist = ((sx - _LENS_CX) ** 2 + (sy - _LENS_CY) ** 2) ** 0.5
         return dist + raccoon.radius * ADS_ZOOM <= _LENS_R
 
@@ -263,14 +270,8 @@ class YardState(BaseState):
 
     def _draw_ads(self, screen):
         """Render a zoomed, circular-lens view centred on the mouse position."""
-        mx, my = pygame.mouse.get_pos()
         yr = self._yard_rect
-
-        vp_w = int(yr.width / ADS_ZOOM)
-        vp_h = int(yr.height / ADS_ZOOM)
-        vp_x = int(max(yr.left, min(mx - vp_w // 2, yr.right - vp_w)))
-        vp_y = int(max(yr.top, min(my - vp_h // 2, yr.bottom - vp_h)))
-        vp_rect = pygame.Rect(vp_x, vp_y, vp_w, vp_h)
+        vp_rect = self._ads_viewport()
 
         try:
             vp_surf = self._yard_surf.subsurface(vp_rect)
