@@ -38,6 +38,9 @@ RACCOON_SIZES = {
 VIEWFINDER_SIZE = 80   # outer decorative border (px)
 HIT_ZONE_SIZE = 40     # inner capture hot-spot (px)
 
+# ADS (aim-down-sights / camera-to-face) zoom
+ADS_ZOOM = 2.5         # how much the view magnifies when right-clicking
+
 # Timing
 YARD_PHOTO_TIME_SEC = 6.0
 TRANSITION_DURATION_MS = 800
