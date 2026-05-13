@@ -1,20 +1,35 @@
 import pygame
 from settings import COL_CCTV_BORDER
 
+_FULL_W = 1280
+_FULL_H = 660  # SCREEN_HEIGHT - HUD_BAR_H
+
 
 class CameraFeed:
+    _bg_cache: dict = {}
+
     def __init__(self, zone):
         self.zone = zone
         self.rect: pygame.Rect = zone.camera_rect
         self.scan_y: float = 0.0
-        self._green_overlay = None
+        self._cctv_overlay = None
 
     def _overlay(self) -> pygame.Surface:
-        if self._green_overlay is None:
+        if self._cctv_overlay is None:
             surf = pygame.Surface((self.rect.width, self.rect.height), pygame.SRCALPHA)
-            surf.fill((0, 55, 0, 55))
-            self._green_overlay = surf
-        return self._green_overlay
+            surf.fill((0, 50, 0, 120))
+            self._cctv_overlay = surf
+        return self._cctv_overlay
+
+    def _get_bg(self, r: pygame.Rect) -> pygame.Surface:
+        key = (self.zone.index, r.width, r.height)
+        if key not in CameraFeed._bg_cache:
+            from src.ui.renderer import draw_yard_background
+            full = pygame.Surface((_FULL_W, _FULL_H))
+            draw_yard_background(full, self.zone.index,
+                                 pygame.Rect(0, 0, _FULL_W, _FULL_H))
+            CameraFeed._bg_cache[key] = pygame.transform.scale(full, (r.width, r.height))
+        return CameraFeed._bg_cache[key]
 
     def update(self, dt: float):
         self.scan_y = (self.scan_y + 75 * dt) % self.rect.height
@@ -22,26 +37,21 @@ class CameraFeed:
     def draw(self, screen, raccoons_in_zone: list, door_hover: bool = False):
         r = self.rect
 
-        # 1. Sky + grass background
-        sky_h = r.height // 3
-        pygame.draw.rect(screen, (20, 40, 65), pygame.Rect(r.left, r.top, r.width, sky_h))
-        pygame.draw.rect(screen, (18, 65, 18),
-                         pygame.Rect(r.left, r.top + sky_h, r.width, r.height - sky_h))
-        pygame.draw.line(screen, (10, 45, 10),
-                         (r.left, r.top + sky_h), (r.right, r.top + sky_h), 2)
+        # 1. Yard background scaled to camera tile size
+        screen.blit(self._get_bg(r), r.topleft)
 
-        # 2. Simple zone prop hint
-        self._draw_zone_hint(screen, r)
-
-        # 3. Raccoon(s) — show at most one, scaled to fit tile
+        # 3. Raccoon(s) — draw all raccoons in zone, scaled to fit tile
         if raccoons_in_zone:
-            raccoon = raccoons_in_zone[0]
             from src.ui.renderer import draw_raccoon
-            rx = r.left + r.width // 2
+            scale = min(r.width / 1280, r.height / 660)
             ry = r.top + int(r.height * 0.65)
-            scale = min(r.width / 1280, r.height / 660) * 2.8
-            scaled_r = max(int(raccoon.radius * scale), 5)
-            draw_raccoon(screen, (rx, ry), scaled_r, raccoon.size)
+            screen.set_clip(r)
+            for raccoon in raccoons_in_zone:
+                rx = r.left + int(raccoon.cam_x * r.width)
+                scaled_r = max(int(raccoon.radius * scale), 3)
+                draw_raccoon(screen, (rx, ry), scaled_r, raccoon.size, raccoon.facing_right,
+                             camera_mode=True)
+            screen.set_clip(None)
 
         # 4. Green CCTV tint overlay
         screen.blit(self._overlay(), r.topleft)
@@ -63,16 +73,9 @@ class CameraFeed:
         # 8. Raccoon count badge + door button
         self._draw_door_button(screen, len(raccoons_in_zone), door_hover)
 
-    def _draw_zone_hint(self, screen, r: pygame.Rect):
-        # A tiny colored rectangle to distinguish zones
-        zone_colors = [(80, 50, 20), (60, 60, 60), (100, 80, 30), (50, 30, 10)]
-        c = zone_colors[self.zone.index % len(zone_colors)]
-        hint_rect = pygame.Rect(r.right - 28, r.top + r.height // 3 - 10, 18, 45)
-        pygame.draw.rect(screen, c, hint_rect)
-
     def _draw_door_button(self, screen, raccoon_count: int, hover: bool):
         r = self.rect
-        btn_w, btn_h = 145, 28
+        btn_w, btn_h = 168, 28
         btn_x = r.right - btn_w - 6
         btn_y = r.bottom - btn_h - 6
         btn_rect = pygame.Rect(btn_x, btn_y, btn_w, btn_h)
@@ -81,7 +84,7 @@ class CameraFeed:
         if has_raccoon:
             bg = (0, 170, 0) if hover else (0, 110, 0)
             border = (0, 255, 100)
-            text = "GO HERE!"
+            text = "Open door to yard"
             text_color = (255, 255, 255)
         else:
             bg = (35, 35, 35)
@@ -102,5 +105,5 @@ class CameraFeed:
 
     def get_door_button_rect(self) -> pygame.Rect:
         r = self.rect
-        btn_w, btn_h = 145, 28
+        btn_w, btn_h = 168, 28
         return pygame.Rect(r.right - btn_w - 6, r.bottom - btn_h - 6, btn_w, btn_h)

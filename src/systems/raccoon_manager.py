@@ -36,6 +36,12 @@ class RaccoonManager:
             return
         for r in self.raccoons:
             r.update(dt)
+            r.update_wander(dt)
+
+    def update_wander_only(self, dt: float):
+        """Tick camera wandering without zone-hopping (used while player watches cameras)."""
+        for r in self.raccoons:
+            r.update_wander(dt)
 
     def get_raccoon_in_zone(self, zone_index: int):
         for r in self.raccoons:

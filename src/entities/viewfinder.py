@@ -9,9 +9,11 @@ class Viewfinder:
         self.hit_size = HIT_ZONE_SIZE
         self.is_hit = False
 
-    def update(self, raccoon_pos=None):
+    def update(self, raccoon_positions=None):
         self.pos = pygame.mouse.get_pos()
-        self.is_hit = bool(raccoon_pos and self.hit_test(raccoon_pos))
+        self.is_hit = bool(
+            raccoon_positions and any(self.hit_test(p) for p in raccoon_positions)
+        )
 
     def hit_test(self, raccoon_pos) -> bool:
         rx, ry = raccoon_pos

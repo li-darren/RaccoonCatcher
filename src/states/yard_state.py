@@ -4,7 +4,7 @@ from src.states.base_state import BaseState
 from src.entities.viewfinder import Viewfinder
 from src.ui.hud import HUD
 from src.ui.renderer import draw_yard_background, draw_raccoon
-from settings import SCREEN_WIDTH, SCREEN_HEIGHT, YARD_PHOTO_TIME_SEC, SHUTTER_FLASH_MS
+from settings import SCREEN_WIDTH, SCREEN_HEIGHT, YARD_PHOTO_TIME_SEC, SHUTTER_FLASH_MS, TRANSITION_DURATION_MS
 
 _FLED_DISPLAY_SEC = 2.0
 
@@ -13,7 +13,7 @@ class YardState(BaseState):
     def __init__(self, game):
         super().__init__(game)
         self.zone_index = 0
-        self.raccoon = None
+        self.raccoons: list = []
         self.viewfinder = Viewfinder()
         self.hud = HUD()
         self.time_remaining = YARD_PHOTO_TIME_SEC
@@ -25,6 +25,10 @@ class YardState(BaseState):
         self.fled_timer = 0.0
         self._shutter_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
         self._pending_result = None
+        self._yard_rect = None
+        self._erratic_timers: list = []   # seconds until next direction/speed change per raccoon
+        self._yard_vy: list = []          # vertical drift per raccoon (px/sec)
+        self._vy_timers: list = []        # seconds until next y-direction change per raccoon
 
     def on_enter(self, data):
         self.zone_index = data.get("target_zone", 0)
@@ -39,19 +43,23 @@ class YardState(BaseState):
 
         pygame.mouse.set_visible(False)
 
-        raccoon = self.game.raccoon_manager.get_raccoon_in_zone(self.zone_index)
-        if raccoon:
+        zone = self.game.zone_manager.get_zone(self.zone_index)
+        self._yard_rect = zone.yard_rect
+
+        all_in_zone = self.game.raccoon_manager.raccoons_in_zone(self.zone_index)
+        present = []
+        for raccoon in all_in_zone:
             flee_p = raccoon.flee_probability(self.game.camera_room_elapsed)
-            if random.random() < flee_p:
-                self.raccoon = None
-                self.raccoon_fled = True
-            else:
-                self.raccoon = raccoon
-                zone = self.game.zone_manager.get_zone(self.zone_index)
-                self.raccoon.set_yard_position(zone.yard_rect)
-        else:
-            self.raccoon = None
-            self.raccoon_fled = False
+            if random.random() >= flee_p:
+                raccoon.set_yard_position_from_camera(
+                    zone.yard_rect, TRANSITION_DURATION_MS / 1000.0)
+                present.append(raccoon)
+
+        self.raccoons = present
+        self.raccoon_fled = bool(all_in_zone) and not present
+        self._erratic_timers = [random.uniform(0.2, 0.8) for _ in present]
+        self._yard_vy = [random.choice([-1, 1]) * random.uniform(15, 45) for _ in present]
+        self._vy_timers = [random.uniform(0.3, 1.0) for _ in present]
 
         self.game.camera_room_elapsed = 0.0
 
@@ -69,16 +77,13 @@ class YardState(BaseState):
         self.shutter_active = True
         self.shutter_elapsed = 0.0
 
-        if self.raccoon and self.viewfinder.hit_test(self.raccoon.yard_pos):
-            self.result_score = self.raccoon.points
-            self.game.score += self.result_score
-            self.game.raccoon_manager.remove(self.raccoon)
-            self._pending_result = dict(score=self.result_score, fled=False,
-                                        timeout=False, zone_index=self.zone_index)
-        else:
-            self.result_score = 0
-            self._pending_result = dict(score=0, fled=False,
-                                        timeout=False, zone_index=self.zone_index)
+        caught = [r for r in self.raccoons if self.viewfinder.hit_test(r.yard_pos)]
+        self.result_score = sum(r.points for r in caught)
+        self.game.score += self.result_score
+        for r in caught:
+            self.game.raccoon_manager.remove(r)
+        self._pending_result = dict(score=self.result_score, fled=False,
+                                    timeout=False, zone_index=self.zone_index)
 
     def update(self, dt):
         if self.raccoon_fled:
@@ -99,8 +104,31 @@ class YardState(BaseState):
             return
 
         self.time_remaining -= dt
-        raccoon_pos = self.raccoon.yard_pos if self.raccoon else None
-        self.viewfinder.update(raccoon_pos)
+
+        yr = self._yard_rect
+        foreground_top = yr.top + int(yr.height * 0.62)
+        foreground_bot = yr.bottom - 40
+
+        for i, r in enumerate(self.raccoons):
+            # Erratic x direction/speed changes
+            self._erratic_timers[i] -= dt
+            if self._erratic_timers[i] <= 0:
+                if random.random() < 0.75:
+                    r.yard_vx = random.choice([-1, 1]) * random.uniform(60, 160)
+                    r.facing_right = r.yard_vx >= 0
+                self._erratic_timers[i] = random.uniform(0.2, 0.7)
+
+            # Erratic y drift
+            self._vy_timers[i] -= dt
+            if self._vy_timers[i] <= 0:
+                self._yard_vy[i] = random.choice([-1, 1]) * random.uniform(15, 50)
+                self._vy_timers[i] = random.uniform(0.3, 0.9)
+
+            r.yard_pos[0] += r.yard_vx * dt
+            r.yard_pos[1] = max(foreground_top,
+                                min(r.yard_pos[1] + self._yard_vy[i] * dt, foreground_bot))
+
+        self.viewfinder.update([r.yard_pos for r in self.raccoons] or None)
 
         if self.time_remaining <= 0:
             self.time_remaining = 0
@@ -111,8 +139,9 @@ class YardState(BaseState):
         zone = self.game.zone_manager.get_zone(self.zone_index)
         draw_yard_background(screen, self.zone_index, zone.yard_rect)
 
-        if self.raccoon and not self.photo_taken:
-            draw_raccoon(screen, self.raccoon.yard_pos, self.raccoon.radius, self.raccoon.size)
+        if not self.photo_taken:
+            for r in self.raccoons:
+                draw_raccoon(screen, r.yard_pos, r.radius, r.size, r.facing_right)
 
         if self.raccoon_fled:
             self._draw_fled_message(screen)

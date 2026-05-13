@@ -1,16 +1,18 @@
 import pygame
 
 
-def draw_raccoon(surface, pos, radius: int, size_label: str = "medium"):
+def draw_raccoon(surface, pos, radius: int, size_label: str = "medium",
+                 facing_right: bool = True, camera_mode: bool = False):
     cx, cy = int(pos[0]), int(pos[1])
 
     # Striped tail (drawn behind body)
     tail_colors = [(90, 90, 90), (30, 30, 30)]
-    seg_r = max(radius // 3, 4)
+    seg_r = max(radius // 3, 2)
+    tail_dir = -1 if facing_right else 1
     for i in range(5):
-        tx = cx + radius + 4 + i * (seg_r + 1)
+        tx = cx + tail_dir * (radius + 3 + i * (seg_r + 1))
         ty = cy + radius // 3 - i * 2
-        pygame.draw.circle(surface, tail_colors[i % 2], (tx, ty), max(seg_r - i, 3))
+        pygame.draw.circle(surface, tail_colors[i % 2], (tx, ty), max(seg_r - i, 1))
 
     # Body
     pygame.draw.circle(surface, (90, 90, 90), (cx, cy), radius)
@@ -21,22 +23,27 @@ def draw_raccoon(surface, pos, radius: int, size_label: str = "medium"):
     pygame.draw.ellipse(surface, (35, 35, 35),
                         (cx - mask_w // 2, cy - mask_h // 2, mask_w, mask_h))
 
-    # Eyes
-    er = max(radius // 4, 3)
+    # Eyes — in camera mode the tapetum reflects the IR light as bright eye-shine
+    er = max(radius // 4, 1)
     eo = radius // 3
-    for ex in [cx - eo, cx + eo]:
-        pygame.draw.circle(surface, (255, 255, 200), (ex, cy - 2), er)
-        pygame.draw.circle(surface, (0, 0, 0), (ex, cy - 2), max(er - 2, 1))
+    if camera_mode:
+        for ex in [cx - eo, cx + eo]:
+            pygame.draw.circle(surface, (180, 255, 180), (ex, cy - 2), er + 2)  # green glow halo
+            pygame.draw.circle(surface, (220, 255, 220), (ex, cy - 2), er)      # bright reflection
+    else:
+        for ex in [cx - eo, cx + eo]:
+            pygame.draw.circle(surface, (255, 255, 200), (ex, cy - 2), er)
+            pygame.draw.circle(surface, (0, 0, 0), (ex, cy - 2), max(er - 2, 1))
 
     # Ears
-    ear_r = max(radius // 3, 5)
+    ear_r = max(radius // 3, 2)
     ear_ox = int(radius * 0.65)
     for ex in [cx - ear_ox, cx + ear_ox]:
         pygame.draw.circle(surface, (75, 75, 75), (ex, cy - radius + 3), ear_r)
         pygame.draw.circle(surface, (160, 100, 100), (ex, cy - radius + 4), max(ear_r - 4, 2))
 
     # Nose
-    nr = max(radius // 6, 2)
+    nr = max(radius // 6, 1)
     pygame.draw.ellipse(surface, (20, 20, 20),
                         (cx - nr, cy + nr - 1, nr * 2, nr + 2))
 
@@ -47,18 +54,20 @@ def draw_yard_background(surface, zone_index: int, yard_rect: pygame.Rect):
     grass_rect = pygame.Rect(yard_rect.left, yard_rect.top + sky_h,
                              yard_rect.width, yard_rect.height - sky_h)
 
-    pygame.draw.rect(surface, (50, 80, 140), sky_rect)
-    pygame.draw.rect(surface, (34, 130, 34), grass_rect)
-    pygame.draw.line(surface, (20, 100, 20),
+    pygame.draw.rect(surface, (5, 8, 28), sky_rect)
+    pygame.draw.rect(surface, (10, 38, 10), grass_rect)
+    pygame.draw.line(surface, (5, 22, 5),
                      (yard_rect.left, yard_rect.top + sky_h),
                      (yard_rect.right, yard_rect.top + sky_h), 4)
 
-    # Night sky decorations
-    pygame.draw.circle(surface, (255, 255, 180),
-                       (yard_rect.right - 110, yard_rect.top + 45), 28)
-    for sx, sy in [(180, 25), (380, 48), (650, 18), (880, 42), (1100, 30)]:
+    # Night sky — moon with soft halo, then stars
+    mx, my = yard_rect.right - 110, yard_rect.top + 45
+    pygame.draw.circle(surface, (60, 60, 40), (mx, my), 38)   # dim glow ring
+    pygame.draw.circle(surface, (200, 200, 140), (mx, my), 28)  # moon body
+    for sx, sy in [(180, 25), (310, 12), (380, 48), (510, 30), (650, 18),
+                   (780, 40), (880, 22), (1000, 38), (1100, 14)]:
         if yard_rect.left <= sx <= yard_rect.right:
-            pygame.draw.circle(surface, (255, 255, 255), (sx, yard_rect.top + sy), 2)
+            pygame.draw.circle(surface, (220, 220, 255), (sx, yard_rect.top + sy), 2)
 
     # Zone-specific props
     if zone_index == 0:
