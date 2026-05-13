@@ -105,20 +105,43 @@ class YardState(BaseState):
     def _ads_viewport(self) -> pygame.Rect:
         """Compute the ADS viewport rect using a linear mouse-to-yard mapping.
 
-        Full mouse range maps to full panning range so every part of the yard
-        is reachable with no dead zones at screen edges.  The returned rect is
-        always clamped inside the yard (satisfies the user-facing constraint
-        that the viewfinder never exceeds the yard boundary).
+        Panning bounds are derived from the lens geometry so that at the
+        extreme mouse positions the lens edge aligns exactly with the yard
+        edge — the lens can reach every part of the yard but never shows
+        content outside it.  The viewport may extend slightly beyond the
+        _yard_surf surface; _get_vp_surf handles that safely.
         """
         mx, my = pygame.mouse.get_pos()
         yr = self._yard_rect
         vp_w = int(yr.width / ADS_ZOOM)
         vp_h = int(yr.height / ADS_ZOOM)
+        # Lens edge in yard-space coords:
+        #   lens_left_yard  = (_LENS_CX - _LENS_R) / ADS_ZOOM  = 134
+        #   lens_right_yard = (_LENS_CX + _LENS_R) / ADS_ZOOM  = 378
+        #   lens_top_yard   = (_LENS_CY - _LENS_R - yr.top) / ADS_ZOOM = 10
+        #   lens_bot_yard   = (_LENS_CY + _LENS_R - yr.top) / ADS_ZOOM = 254
+        vp_x_min = yr.left  - int((_LENS_CX - _LENS_R - yr.left) / ADS_ZOOM)
+        vp_x_max = yr.right - int((_LENS_CX + _LENS_R - yr.left) / ADS_ZOOM)
+        vp_y_min = yr.top   - int((_LENS_CY - _LENS_R - yr.top)  / ADS_ZOOM)
+        vp_y_max = yr.bottom - int((_LENS_CY + _LENS_R - yr.top) / ADS_ZOOM)
         tx = max(0.0, min(mx / max(SCREEN_WIDTH - 1, 1), 1.0))
         ty = max(0.0, min((my - yr.top) / max(yr.height - 1, 1), 1.0))
-        vp_x = yr.left + int(tx * (yr.width - vp_w))
-        vp_y = yr.top + int(ty * (yr.height - vp_h))
+        vp_x = vp_x_min + int(tx * (vp_x_max - vp_x_min))
+        vp_y = vp_y_min + int(ty * (vp_y_max - vp_y_min))
         return pygame.Rect(vp_x, vp_y, vp_w, vp_h)
+
+    def _get_vp_surf(self, vp_rect: pygame.Rect) -> pygame.Surface:
+        """Extract the ADS viewport, filling any out-of-bounds area with COL_BG.
+
+        Out-of-bounds pixels are always in the dark overlay region (outside the
+        lens circle), so the player never sees them.
+        """
+        surf = pygame.Surface((vp_rect.w, vp_rect.h))
+        surf.fill(COL_BG)
+        src_rect = vp_rect.clip(self._yard_surf.get_rect())
+        if src_rect.w > 0 and src_rect.h > 0:
+            surf.blit(self._yard_surf, (src_rect.x - vp_rect.x, src_rect.y - vp_rect.y), src_rect)
+        return surf
 
     def _capture_photo(self):
         """Return a Surface cropped to the ADS viewport around the cursor."""
@@ -126,10 +149,7 @@ class YardState(BaseState):
         vp_rect = self._ads_viewport()
         vp_w, vp_h = vp_rect.w, vp_rect.h
 
-        try:
-            region = self._yard_surf.subsurface(vp_rect)
-        except ValueError:
-            return None
+        region = self._get_vp_surf(vp_rect)
 
         # Scale to photo display size (preserve original aspect ratio)
         photo_w, photo_h = 420, int(420 * vp_h / vp_w)
@@ -273,13 +293,7 @@ class YardState(BaseState):
         yr = self._yard_rect
         vp_rect = self._ads_viewport()
 
-        try:
-            vp_surf = self._yard_surf.subsurface(vp_rect)
-        except ValueError:
-            screen.blit(self._yard_surf, (0, 0))
-            return
-
-        zoomed = pygame.transform.scale(vp_surf, (yr.width, yr.height))
+        zoomed = pygame.transform.scale(self._get_vp_surf(vp_rect), (yr.width, yr.height))
         screen.blit(zoomed, (yr.left, yr.top))
 
         # Circular vignette — dark outside lens, clear inside
