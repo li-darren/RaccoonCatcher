@@ -81,28 +81,12 @@ class CameraFeed:
         btn_y = r.bottom - btn_h - 6
         btn_rect = pygame.Rect(btn_x, btn_y, btn_w, btn_h)
 
-        has_raccoon = raccoon_count > 0
-        if has_raccoon:
-            bg = (0, 170, 0) if hover else (0, 110, 0)
-            border = (0, 255, 100)
-            text = "Open door to yard"
-            text_color = (255, 255, 255)
-        else:
-            bg = (35, 35, 35)
-            border = (70, 70, 70)
-            text = "CLEAR"
-            text_color = (90, 90, 90)
-
+        bg = (0, 170, 0) if hover else (0, 110, 0)
         pygame.draw.rect(screen, bg, btn_rect, border_radius=5)
-        pygame.draw.rect(screen, border, btn_rect, 2, border_radius=5)
+        pygame.draw.rect(screen, (0, 255, 100), btn_rect, 2, border_radius=5)
         font = pygame.font.SysFont("Arial", 13, bold=True)
-        t_surf = font.render(text, True, text_color)
+        t_surf = font.render("Open door to yard", True, (255, 255, 255))
         screen.blit(t_surf, t_surf.get_rect(center=btn_rect.center))
-
-        if has_raccoon:
-            badge_font = pygame.font.SysFont("Arial", 11, bold=True)
-            badge = badge_font.render(f"{raccoon_count} raccoon(s) spotted!", True, (255, 220, 0))
-            screen.blit(badge, (btn_x, btn_y - 17))
 
     def get_door_button_rect(self) -> pygame.Rect:
         r = self.rect

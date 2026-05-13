@@ -22,11 +22,9 @@ class CameraState(BaseState):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for i, feed in enumerate(self.feeds):
                 if feed.get_door_button_rect().collidepoint(event.pos):
-                    # Only allow going to a zone where a raccoon is visible
-                    if any(r.is_camera_visible for r in self.game.raccoon_manager.raccoons_in_zone(i)):
-                        self.game.target_zone = i
-                        self.game.change_state("transition", target_zone=i)
-                        return
+                    self.game.target_zone = i
+                    self.game.change_state("transition", target_zone=i)
+                    return
 
     def update(self, dt):
         self.game.timer_remaining -= dt
