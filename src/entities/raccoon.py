@@ -37,6 +37,12 @@ class Raccoon:
         self.facing_right: bool = self.cam_vx >= 0
         self._dir_timer: float = random.uniform(3.0, 9.0)
 
+        # Camera vertical wandering (normalized: 0=top, 1=bottom).
+        # Constrained to ground band ~0.58–0.75 for natural sniffing/roaming.
+        self.cam_y: float = random.uniform(0.61, 0.69)
+        self.cam_vy: float = random.choice([-1, 1]) * random.uniform(0.006, 0.014)
+        self._vy_timer: float = random.uniform(2.0, 6.0)
+
         # Zone-hop animation state
         self._hopping: bool = False
         self._hop_target_zone: int = -1
@@ -62,9 +68,9 @@ class Raccoon:
         return False
 
     def update_wander(self, dt: float):
-        """Tick lateral wandering for the camera view."""
+        """Tick lateral and vertical wandering for the camera view."""
         if self._hopping:
-            # Walk off-screen at full speed in the current travel direction
+            # Walk off-screen horizontally; freeze vertical for a clean exit arc
             self.cam_vx = 0.08 if self.facing_right else -0.08
             self.cam_x += self.cam_vx * dt
             # Once fully off-screen, commit the zone change and enter from opposite edge
@@ -85,6 +91,18 @@ class Raccoon:
                 self.facing_right = False
                 self._entering = True
             return
+
+        # Vertical drift — active during both entry and normal wander
+        self.cam_y += self.cam_vy * dt
+        if self.cam_y < 0.58:
+            self.cam_vy = abs(self.cam_vy)
+        elif self.cam_y > 0.75:
+            self.cam_vy = -abs(self.cam_vy)
+        self._vy_timer -= dt
+        if self._vy_timer <= 0:
+            if random.random() < 0.45:
+                self.cam_vy = -self.cam_vy
+            self._vy_timer = random.uniform(2.0, 6.0)
 
         self.cam_x += self.cam_vx * dt
 
@@ -136,7 +154,9 @@ class Raccoon:
         x += self.yard_vx * transition_sec
         self.yard_pos[0] = max(yard_rect.left + margin,
                                min(x, yard_rect.right - margin))
-        # 65% of yard height maps exactly to where the raccoon sits on camera,
-        # and falls below all zone props in the foreground grass.
-        self.yard_pos[1] = yard_rect.top + int(yard_rect.height * 0.65)
+        # Mirror cam_y into yard space, clamped to the foreground grass band.
+        foreground_top = yard_rect.top + int(yard_rect.height * 0.62)
+        foreground_bot = yard_rect.bottom - margin - 40
+        y = yard_rect.top + int(self.cam_y * yard_rect.height)
+        self.yard_pos[1] = max(foreground_top, min(y, foreground_bot))
 

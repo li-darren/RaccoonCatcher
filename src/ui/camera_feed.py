@@ -57,9 +57,9 @@ class CameraFeed:
         visible = [rc for rc in raccoons_in_zone if rc.is_camera_visible]
         if visible:
             from src.ui.renderer import draw_raccoon
-            ry = r.top + int(r.height * 0.65)
             for raccoon in visible:
                 rx = r.left + int(raccoon.cam_x * r.width)
+                ry = r.top + int(raccoon.cam_y * r.height)
                 scaled_r = max(int(raccoon.radius * scale), 3)
                 draw_raccoon(screen, (rx, ry), scaled_r, raccoon.size, raccoon.facing_right,
                              camera_mode=True)

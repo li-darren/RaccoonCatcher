@@ -246,12 +246,16 @@ def test_set_yard_position_y_in_foreground_band():
 # set_yard_position_from_camera
 # ---------------------------------------------------------------------------
 
-def test_set_yard_position_from_camera_y_at_65_percent():
+def test_set_yard_position_from_camera_y_mirrors_cam_y():
     r = Raccoon("medium", zone_index=0)
     r.cam_x = 0.5
     r.cam_vx = 0.03
+    r.cam_y = 0.68
     r.set_yard_position_from_camera(YARD, transition_sec=0.0)
-    expected_y = YARD.top + int(YARD.height * 0.65)
+    # Y should map from cam_y, clamped to the foreground band (>= 62% height)
+    foreground_top = YARD.top + int(YARD.height * 0.62)
+    assert r.yard_pos[1] >= foreground_top
+    expected_y = YARD.top + int(r.cam_y * YARD.height)
     assert r.yard_pos[1] == expected_y
 
 
