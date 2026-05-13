@@ -1,6 +1,16 @@
 # src/systems
 
-This directory contains the game systems: `level_config.py` (level definitions), `raccoon_manager.py` (spawning/respawning), and `zone_manager.py` (zone layout and positioning).
+This directory contains the game systems: `level_config.py` (level definitions), `raccoon_manager.py` (spawning/respawning), `zone_manager.py` (zone layout and positioning), and `distraction_manager.py` (visual distraction entities).
+
+## DistractionManager
+
+`distraction_manager.py` manages three lists — `birds`, `leaves`, `trash_bags` — plus per-zone spawn timers for birds and leaves.
+
+- **`reset(num_zones)`** — clears birds and leaves, creates one fresh `TrashBag` per zone at a random position, and resets all spawn timers to a random value drawn from `BIRD_SPAWN_INTERVAL` / `LEAF_SPAWN_INTERVAL`. Call this alongside `raccoon_manager.populate()` in `Game.reset_level`.
+- **`update(dt)`** — ticks spawn timers; when a timer fires it appends a new `Bird` or `Leaf` for that zone (if below `BIRD_MAX_PER_ZONE` / `LEAF_MAX_PER_ZONE`) and resets the timer. Also calls `update(dt)` on every bird/leaf and removes those that return `True` (off-screen). Trash bags are never updated.
+- **`birds_in_zone(i)`**, **`leaves_in_zone(i)`**, **`trash_bags_in_zone(i)`** — filter the respective list by `zone_index`. Use these in rendering, mirroring `RaccoonManager.raccoons_in_zone`.
+
+`game.distraction_manager` is updated in both `CameraState.update` and `YardState.update` so entities keep moving regardless of which view the player is in.
 
 ## Adding a new level
 

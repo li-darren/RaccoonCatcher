@@ -1,5 +1,5 @@
 import pygame
-from settings import COL_CCTV_BORDER
+from settings import COL_CCTV_BORDER, BIRD_RADIUS, LEAF_RADIUS, TRASH_BAG_RADIUS
 
 _FULL_W = 1280
 _FULL_H = 660  # SCREEN_HEIGHT - HUD_BAR_H
@@ -34,25 +34,51 @@ class CameraFeed:
     def update(self, dt: float):
         self.scan_y = (self.scan_y + 75 * dt) % self.rect.height
 
-    def draw(self, screen, raccoons_in_zone: list, door_hover: bool = False):
+    def draw(self, screen, raccoons_in_zone: list, door_hover: bool = False,
+             distraction_manager=None):
         r = self.rect
+        scale = min(r.width / 1280, r.height / 660)
 
         # 1. Yard background scaled to camera tile size
         screen.blit(self._get_bg(r), r.topleft)
+
+        screen.set_clip(r)
+
+        # 2. Trash bags — static ground-level blobs drawn before raccoons
+        if distraction_manager is not None:
+            from src.ui.renderer import draw_bird, draw_leaf, draw_trash_bag
+            for bag in distraction_manager.trash_bags_in_zone(self.zone.index):
+                bx = r.left + int(bag.cam_x * r.width)
+                by = r.top + int(bag.cam_y_frac * r.height)
+                draw_trash_bag(screen, (bx, by), max(int(TRASH_BAG_RADIUS * scale), 3),
+                               camera_mode=True)
 
         # 3. Raccoon(s) — only draw raccoons that are within the visible feed area
         visible = [rc for rc in raccoons_in_zone if rc.is_camera_visible]
         if visible:
             from src.ui.renderer import draw_raccoon
-            scale = min(r.width / 1280, r.height / 660)
             ry = r.top + int(r.height * 0.65)
-            screen.set_clip(r)
             for raccoon in visible:
                 rx = r.left + int(raccoon.cam_x * r.width)
                 scaled_r = max(int(raccoon.radius * scale), 3)
                 draw_raccoon(screen, (rx, ry), scaled_r, raccoon.size, raccoon.facing_right,
                              camera_mode=True)
-            screen.set_clip(None)
+
+        # 3b. Birds and leaves drawn over raccoons, before CCTV tint
+        if distraction_manager is not None:
+            from src.ui.renderer import draw_bird, draw_leaf
+            for bird in distraction_manager.birds_in_zone(self.zone.index):
+                bx = r.left + int(bird.cam_x * r.width)
+                by = r.top + int(bird.cam_y_frac * r.height)
+                draw_bird(screen, (bx, by), max(int(BIRD_RADIUS * scale), 2),
+                          bird.facing_right, bird.wing_phase, camera_mode=True)
+            for leaf in distraction_manager.leaves_in_zone(self.zone.index):
+                lx = r.left + int(leaf.cam_x * r.width)
+                ly = r.top + int(leaf.cam_y_frac * r.height)
+                draw_leaf(screen, (lx, ly), max(int(LEAF_RADIUS * scale), 1),
+                          leaf.rotation, leaf.color, camera_mode=True)
+
+        screen.set_clip(None)
 
         # 4. Green CCTV tint overlay
         screen.blit(self._overlay(), r.topleft)

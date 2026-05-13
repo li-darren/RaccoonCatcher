@@ -1,3 +1,4 @@
+import math
 import pygame
 
 
@@ -46,6 +47,47 @@ def draw_raccoon(surface, pos, radius: int, size_label: str = "medium",
     nr = max(radius // 6, 1)
     pygame.draw.ellipse(surface, (20, 20, 20),
                         (cx - nr, cy + nr - 1, nr * 2, nr + 2))
+
+
+def draw_bird(surface, pos, radius: int, facing_right: bool = True,
+              wing_phase: float = 0.0, camera_mode: bool = False):
+    cx, cy = int(pos[0]), int(pos[1])
+    col = (160, 200, 160) if camera_mode else (45, 42, 38)
+    r = max(radius, 2)
+    flap = int(math.sin(wing_phase) * r * 1.4)
+    pygame.draw.circle(surface, col, (cx, cy), max(r // 2, 1))
+    pygame.draw.line(surface, col, (cx, cy), (cx - r * 3, cy - flap), max(r // 3, 1))
+    pygame.draw.line(surface, col, (cx, cy), (cx + r * 3, cy - flap), max(r // 3, 1))
+
+
+def draw_leaf(surface, pos, radius: int, rotation: float = 0.0,
+              color=(60, 120, 30), camera_mode: bool = False):
+    cx, cy = int(pos[0]), int(pos[1])
+    col = (80, 160, 80) if camera_mode else color
+    r = max(radius, 1)
+    if r <= 2:
+        pygame.draw.circle(surface, col, (cx, cy), r)
+        return
+    angle = math.radians(rotation)
+    cos_a, sin_a = math.cos(angle), math.sin(angle)
+    points = []
+    for t_deg in range(0, 360, 40):
+        t = math.radians(t_deg)
+        lx = r * 2.2 * math.cos(t)
+        ly = r * math.sin(t)
+        points.append((cx + int(lx * cos_a - ly * sin_a),
+                        cy + int(lx * sin_a + ly * cos_a)))
+    pygame.draw.polygon(surface, col, points)
+
+
+def draw_trash_bag(surface, pos, radius: int, camera_mode: bool = False):
+    cx, cy = int(pos[0]), int(pos[1])
+    body_col = (40, 45, 40) if camera_mode else (25, 28, 22)
+    knot_col = (60, 65, 58) if camera_mode else (42, 46, 38)
+    r = max(radius, 5)
+    pygame.draw.circle(surface, body_col, (cx, cy), r)
+    pygame.draw.circle(surface, body_col, (cx + r // 3, cy - r // 4), r * 3 // 4)
+    pygame.draw.circle(surface, knot_col, (cx + r // 4, cy - r), max(r // 5, 2))
 
 
 def draw_yard_background(surface, zone_index: int, yard_rect: pygame.Rect):

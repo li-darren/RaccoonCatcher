@@ -28,8 +28,8 @@ class CameraState(BaseState):
 
     def update(self, dt):
         self.game.timer_remaining -= dt
-        self.game.camera_room_elapsed += dt
         self.game.raccoon_manager.update(dt)
+        self.game.distraction_manager.update(dt)
 
         for feed in self.feeds:
             feed.update(dt)
@@ -50,7 +50,8 @@ class CameraState(BaseState):
         screen.fill(COL_BG)
         for i, feed in enumerate(self.feeds):
             raccoons = self.game.raccoon_manager.raccoons_in_zone(i)
-            feed.draw(screen, raccoons, door_hover=(self._hover_zone == i))
+            feed.draw(screen, raccoons, door_hover=(self._hover_zone == i),
+                      distraction_manager=self.game.distraction_manager)
 
         self.hud.draw_camera_hud(
             screen,

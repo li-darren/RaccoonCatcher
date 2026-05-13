@@ -3,14 +3,12 @@ import pygame
 from src.states.base_state import BaseState
 from src.entities.viewfinder import Viewfinder
 from src.ui.hud import HUD
-from src.ui.renderer import draw_yard_background, draw_raccoon
+from src.ui.renderer import draw_yard_background, draw_raccoon, draw_bird, draw_leaf, draw_trash_bag
 from settings import (
     SCREEN_WIDTH, SCREEN_HEIGHT, HUD_BAR_H, COL_BG,
     YARD_PHOTO_TIME_SEC, SHUTTER_FLASH_MS, TRANSITION_DURATION_MS,
-    ADS_ZOOM,
+    ADS_ZOOM, BIRD_RADIUS, LEAF_RADIUS, TRASH_BAG_RADIUS,
 )
-
-_FLED_DISPLAY_SEC = 2.0
 
 # Lens geometry — circular vignette for ADS mode
 _LENS_CX = SCREEN_WIDTH // 2
@@ -26,12 +24,10 @@ class YardState(BaseState):
         self.viewfinder = Viewfinder()
         self.hud = HUD()
         self.time_remaining = YARD_PHOTO_TIME_SEC
-        self.raccoon_fled = False
         self.photo_taken = False
         self.result_score = 0
         self.shutter_elapsed = 0.0
         self.shutter_active = False
-        self.fled_timer = 0.0
         self._shutter_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
         self._pending_result = None
         self._yard_rect = None
@@ -51,12 +47,10 @@ class YardState(BaseState):
     def on_enter(self, data):
         self.zone_index = data.get("target_zone", 0)
         self.time_remaining = YARD_PHOTO_TIME_SEC
-        self.raccoon_fled = False
         self.photo_taken = False
         self.result_score = 0
         self.shutter_active = False
         self.shutter_elapsed = 0.0
-        self.fled_timer = 0.0
         self._pending_result = None
         self._aiming = False
 
@@ -66,28 +60,19 @@ class YardState(BaseState):
         self._yard_rect = zone.yard_rect
 
         all_in_zone = self.game.raccoon_manager.raccoons_in_zone(self.zone_index)
-        present = []
         for raccoon in all_in_zone:
-            flee_p = raccoon.flee_probability(self.game.camera_room_elapsed)
-            if random.random() >= flee_p:
-                raccoon.set_yard_position_from_camera(
-                    zone.yard_rect, TRANSITION_DURATION_MS / 1000.0)
-                present.append(raccoon)
-
-        self.raccoons = present
-        self.raccoon_fled = bool(all_in_zone) and not present
-        self._erratic_timers = [random.uniform(0.2, 0.8) for _ in present]
-        self._yard_vy = [random.choice([-1, 1]) * random.uniform(15, 45) for _ in present]
-        self._vy_timers = [random.uniform(0.3, 1.0) for _ in present]
-
-        self.game.camera_room_elapsed = 0.0
+            raccoon.set_yard_position_from_camera(zone.yard_rect, TRANSITION_DURATION_MS / 1000.0)
+        self.raccoons = list(all_in_zone)
+        self._erratic_timers = [random.uniform(0.2, 0.8) for _ in self.raccoons]
+        self._yard_vy = [random.choice([-1, 1]) * random.uniform(15, 45) for _ in self.raccoons]
+        self._vy_timers = [random.uniform(0.3, 1.0) for _ in self.raccoons]
 
     def on_exit(self):
         pygame.mouse.set_visible(True)
         self._aiming = False
 
     def handle_event(self, event):
-        if self.photo_taken or self.raccoon_fled:
+        if self.photo_taken:
             return
         if event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1 and self._aiming:
@@ -196,7 +181,7 @@ class YardState(BaseState):
         for r in caught:
             self.game.raccoon_manager.remove(r)
         self._pending_result = dict(
-            score=self.result_score, fled=False,
+            score=self.result_score,
             timeout=False, zone_index=self.zone_index,
             photo=photo,
         )
@@ -206,13 +191,6 @@ class YardState(BaseState):
     # ------------------------------------------------------------------
 
     def update(self, dt):
-        if self.raccoon_fled:
-            self.fled_timer += dt
-            if self.fled_timer >= _FLED_DISPLAY_SEC:
-                self.game.change_state("result", score=0, fled=True,
-                                       timeout=False, zone_index=self.zone_index)
-            return
-
         if self.shutter_active:
             self.shutter_elapsed += dt * 1000
             if self.shutter_elapsed >= SHUTTER_FLASH_MS and self._pending_result is not None:
@@ -246,6 +224,8 @@ class YardState(BaseState):
             r.yard_pos[1] = max(foreground_top,
                                 min(r.yard_pos[1] + self._yard_vy[i] * dt, foreground_bot))
 
+        self.game.distraction_manager.update(dt)
+
         self.viewfinder.update([r.yard_pos for r in self.raccoons] or None)
         if self._aiming:
             # In ADS mode, reticle turns green only when a raccoon is fully inside the lens
@@ -269,16 +249,32 @@ class YardState(BaseState):
         self._yard_surf.fill(COL_BG)
         draw_yard_background(self._yard_surf, self.zone_index, zone.yard_rect)
         if not self.photo_taken:
+            yr = zone.yard_rect
+            dm = self.game.distraction_manager
+            # Birds fly in the sky band — draw before ground entities
+            for bird in dm.birds_in_zone(self.zone_index):
+                bx = yr.left + int(bird.cam_x * yr.width)
+                by = yr.top + int(bird.cam_y_frac * yr.height)
+                draw_bird(self._yard_surf, (bx, by), BIRD_RADIUS,
+                          bird.facing_right, bird.wing_phase)
+            # Trash bags sit at ground level — drawn before raccoons so raccoons appear in front
+            for bag in dm.trash_bags_in_zone(self.zone_index):
+                bx = yr.left + int(bag.cam_x * yr.width)
+                by = yr.top + int(bag.cam_y_frac * yr.height)
+                draw_trash_bag(self._yard_surf, (bx, by), TRASH_BAG_RADIUS)
             for r in self.raccoons:
                 draw_raccoon(self._yard_surf, r.yard_pos, r.radius, r.size, r.facing_right)
+            # Leaves fall in front of everything
+            for leaf in dm.leaves_in_zone(self.zone_index):
+                lx = yr.left + int(leaf.cam_x * yr.width)
+                ly = yr.top + int(leaf.cam_y_frac * yr.height)
+                draw_leaf(self._yard_surf, (lx, ly), LEAF_RADIUS, leaf.rotation, leaf.color)
 
-        if self._aiming and not self.photo_taken and not self.raccoon_fled:
+        if self._aiming and not self.photo_taken:
             self._draw_ads(screen)
         else:
             screen.blit(self._yard_surf, (0, 0))
-            if self.raccoon_fled:
-                self._draw_fled_message(screen)
-            elif not self.photo_taken:
+            if not self.photo_taken:
                 self.viewfinder.draw_cursor(screen)
 
         self.hud.draw_yard_hud(screen, max(self.time_remaining, 0.0), zone.name)
@@ -312,12 +308,3 @@ class YardState(BaseState):
         # Precision reticle at lens centre
         self.viewfinder.draw_aiming_reticle(screen, _LENS_CX, _LENS_CY)
 
-    def _draw_fled_message(self, screen):
-        font = pygame.font.SysFont("Arial", 52, bold=True)
-        surf = font.render("The raccoon ran away!", True, (255, 200, 0))
-        cx, cy = screen.get_width() // 2, screen.get_height() // 2
-        screen.blit(surf, surf.get_rect(center=(cx, cy - 20)))
-
-        font2 = pygame.font.SysFont("Arial", 28)
-        sub = font2.render("You spent too long at the cameras...", True, (200, 200, 200))
-        screen.blit(sub, sub.get_rect(center=(cx, cy + 45)))

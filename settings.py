@@ -41,6 +41,18 @@ HIT_ZONE_SIZE = 40     # inner capture hot-spot (px)
 # ADS (aim-down-sights / camera-to-face) zoom
 ADS_ZOOM = 2.5         # how much the view magnifies when right-clicking
 
+# Distractions
+BIRD_SPAWN_INTERVAL = (8.0, 20.0)   # seconds between bird appearances per zone
+BIRD_MAX_PER_ZONE = 2
+BIRD_RADIUS = 7                     # pixels at full yard resolution
+BIRD_Y_RANGE = (0.06, 0.30)        # cam_y_frac range (sky band)
+
+LEAF_SPAWN_INTERVAL = (2.0, 6.0)
+LEAF_MAX_PER_ZONE = 4
+LEAF_RADIUS = 4
+
+TRASH_BAG_RADIUS = 15
+
 # Timing
 YARD_PHOTO_TIME_SEC = 6.0
 TRANSITION_DURATION_MS = 800

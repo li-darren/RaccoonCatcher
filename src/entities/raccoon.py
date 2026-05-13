@@ -140,7 +140,3 @@ class Raccoon:
         # and falls below all zone props in the foreground grass.
         self.yard_pos[1] = yard_rect.top + int(yard_rect.height * 0.65)
 
-    def flee_probability(self, seconds_in_camera: float) -> float:
-        """Chance the raccoon bolts before the player arrives."""
-        base = self.wariness * min(seconds_in_camera / 60.0, 1.0)
-        return min(base, 0.95)

@@ -1,6 +1,16 @@
 # src/entities
 
-This directory contains the core entity classes: `raccoon.py` (the `Raccoon` entity) and `viewfinder.py` (the `Viewfinder` entity).
+This directory contains all entity classes: `raccoon.py`, `viewfinder.py`, `bird.py`, `leaf.py`, and `trash_bag.py`.
+
+## Distraction entities
+
+Three purely cosmetic entity types create visual noise that may fool the player into thinking a raccoon is present. None of them interact with the viewfinder hit test.
+
+**`Bird`** (`bird.py`) — flies across the sky band (`cam_y_frac ∈ [0.06, 0.30]`) in a straight horizontal line. Spawns off-screen at `cam_x = -0.12` (rightward) or `cam_x = 1.12` (leftward). `update(dt)` advances `cam_x` by `cam_vx * dt` and increments `wing_phase` (used by `draw_bird` for the flapping M-shape silhouette). Returns `True` when fully off the far edge (`cam_x < -0.2` or `> 1.2`), signalling the manager to remove it.
+
+**`Leaf`** (`leaf.py`) — falls from near the top of the frame (`cam_y_frac` starts in `[-0.05, 0]`) to below the bottom (`> 1.1`). Horizontal position oscillates with a sine wave (`drift_amp`, `drift_freq`, `drift_phase`). `rotation` spins at `rot_speed` degrees/sec. Carries a `color` tuple drawn by `draw_leaf`. Returns `True` from `update(dt)` when off-screen below.
+
+**`TrashBag`** (`trash_bag.py`) — static; no `update` method. Placed once per zone at a random `cam_x ∈ [0.15, 0.85]` and fixed `cam_y_frac = 0.65` (matching raccoon ground level). Does not move for the lifetime of the level.
 
 ## Raccoon entry behaviour
 

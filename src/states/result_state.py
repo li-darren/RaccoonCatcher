@@ -10,7 +10,6 @@ class ResultState(BaseState):
     def __init__(self, game):
         super().__init__(game)
         self.score = 0
-        self.fled = False
         self.timeout = False
         self.zone_index = 0
         self.display_timer = 0.0
@@ -23,7 +22,6 @@ class ResultState(BaseState):
 
     def on_enter(self, data):
         self.score = data.get("score", 0)
-        self.fled = data.get("fled", False)
         self.timeout = data.get("timeout", False)
         self.zone_index = data.get("zone_index", 0)
         self.photo = data.get("photo", None)
@@ -84,11 +82,7 @@ class ResultState(BaseState):
             result_cy = SCREEN_HEIGHT // 2
 
         # --- Result text ---
-        if self.fled:
-            main_text = "RACCOON FLED!"
-            main_color = (255, 160, 0)
-            sub_text = "You took too long at the cameras..."
-        elif self.timeout:
+        if self.timeout:
             main_text = "TOO SLOW!"
             main_color = (255, 80, 80)
             sub_text = "The raccoon escaped while you were aiming!"

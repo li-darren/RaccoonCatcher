@@ -14,17 +14,18 @@ class Game:
         self.level = 1
         self.timer_remaining = 0.0
         self.target_zone = 0
-        self.camera_room_elapsed = 0.0
         self.raccoons_paused = False
 
         # Import systems here to avoid circular imports at module level
         from src.systems.level_config import LEVELS
         from src.systems.zone_manager import ZoneManager
         from src.systems.raccoon_manager import RaccoonManager
+        from src.systems.distraction_manager import DistractionManager
 
         self.level_config = LEVELS[0]
         self.zone_manager = ZoneManager()
         self.raccoon_manager = RaccoonManager(self)
+        self.distraction_manager = DistractionManager()
 
         # Build all states after systems are ready
         from src.states.menu_state import MenuState
@@ -59,9 +60,9 @@ class Game:
         self.level_config = LEVELS[idx]
         self.score = 0
         self.timer_remaining = self.level_config.time_limit_sec
-        self.camera_room_elapsed = 0.0
         self.raccoons_paused = False
         self.raccoon_manager.populate(self.level_config)
+        self.distraction_manager.reset(len(self.zone_manager.zones))
 
     def run(self):
         while self.running:
