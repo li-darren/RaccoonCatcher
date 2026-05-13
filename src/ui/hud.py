@@ -1,5 +1,6 @@
 import pygame
 from settings import SCREEN_WIDTH, HUD_BAR_H, COL_WHITE, COL_GOLD
+from src.ui.hud_format import format_timer, timer_color, photo_bar_ratio, photo_bar_color
 
 
 class HUD:
@@ -20,10 +21,8 @@ class HUD:
         screen.blit(score_surf, score_surf.get_rect(
             center=(SCREEN_WIDTH // 2, HUD_BAR_H // 2)))
 
-        mins = int(timer_sec) // 60
-        secs = int(timer_sec) % 60
-        timer_color = (255, 70, 70) if timer_sec < 30 else COL_WHITE
-        timer_surf = self.font_large.render(f"TIME: {mins:02d}:{secs:02d}", True, timer_color)
+        timer_surf = self.font_large.render(f"TIME: {format_timer(timer_sec)}", True,
+                                            timer_color(timer_sec))
         screen.blit(timer_surf, (SCREEN_WIDTH - timer_surf.get_width() - 18,
                                   (HUD_BAR_H - timer_surf.get_height()) // 2))
 
@@ -37,14 +36,13 @@ class HUD:
 
         # Photo timer bar
         bar_total = 280
-        ratio = max(timer_sec / 6.0, 0.0)
-        bar_filled = int(bar_total * ratio)
+        bar_filled = int(bar_total * photo_bar_ratio(timer_sec))
         bx = SCREEN_WIDTH // 2 + 20
         by = (HUD_BAR_H - 18) // 2
         pygame.draw.rect(screen, (35, 35, 35), (bx, by, bar_total, 18), border_radius=5)
         if bar_filled > 0:
-            color = (70, 190, 70) if timer_sec > 3 else (200, 70, 70)
-            pygame.draw.rect(screen, color, (bx, by, bar_filled, 18), border_radius=5)
+            pygame.draw.rect(screen, photo_bar_color(timer_sec),
+                             (bx, by, bar_filled, 18), border_radius=5)
         pygame.draw.rect(screen, (160, 160, 160), (bx, by, bar_total, 18), 2, border_radius=5)
 
         hint = self.font_small.render("Click to photograph!", True, (180, 180, 255))

@@ -34,11 +34,9 @@ class TransitionState(BaseState):
             self.game.change_state("yard", target_zone=self.target_zone)
 
     def draw(self, screen):
+        from src.states.transition_logic import compute_fade_alpha
         half = TRANSITION_DURATION_MS / 2
-        if self.phase == "fade_out":
-            alpha = min(int(255 * self.elapsed_ms / half), 255)
-        else:
-            alpha = max(int(255 * (1.0 - self.elapsed_ms / half)), 0)
+        alpha = compute_fade_alpha(self.elapsed_ms, self.phase, half)
 
         self._overlay.set_alpha(alpha)
         screen.blit(self._overlay, (0, 0))

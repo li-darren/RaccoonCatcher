@@ -21,14 +21,10 @@ class ZoneManager:
         self.zones = self._build_zones()
 
     def _build_zones(self):
-        positions = []
-        for row in range(2):
-            for col in range(2):
-                x = CAMERA_PAD + col * (CAMERA_FEED_W + CAMERA_PAD)
-                y = HUD_BAR_H + CAMERA_PAD + row * (CAMERA_FEED_H + CAMERA_PAD)
-                positions.append(pygame.Rect(x, y, CAMERA_FEED_W, CAMERA_FEED_H))
-
-        yard_rect = pygame.Rect(0, HUD_BAR_H, SCREEN_WIDTH, SCREEN_HEIGHT - HUD_BAR_H)
+        from src.systems.zone_layout import camera_grid_rects, yard_rect_bounds
+        positions = [pygame.Rect(*r) for r in
+                     camera_grid_rects(CAMERA_PAD, CAMERA_FEED_W, CAMERA_FEED_H, HUD_BAR_H)]
+        yard_rect = pygame.Rect(*yard_rect_bounds(SCREEN_WIDTH, SCREEN_HEIGHT, HUD_BAR_H))
 
         colors = [
             ((40, 80, 40),  (100, 60, 30)),   # Front Yard

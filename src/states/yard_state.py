@@ -88,31 +88,14 @@ class YardState(BaseState):
     # ------------------------------------------------------------------
 
     def _ads_viewport(self) -> pygame.Rect:
-        """Compute the ADS viewport rect using a linear mouse-to-yard mapping.
-
-        Panning bounds are derived from the lens geometry so that at the
-        extreme mouse positions the lens edge aligns exactly with the yard
-        edge — the lens can reach every part of the yard but never shows
-        content outside it.  The viewport may extend slightly beyond the
-        _yard_surf surface; _get_vp_surf handles that safely.
-        """
+        """Compute the ADS viewport rect using a linear mouse-to-yard mapping."""
+        from src.states.yard_logic import ads_viewport
         mx, my = pygame.mouse.get_pos()
         yr = self._yard_rect
-        vp_w = int(yr.width / ADS_ZOOM)
-        vp_h = int(yr.height / ADS_ZOOM)
-        # Lens edge in yard-space coords:
-        #   lens_left_yard  = (_LENS_CX - _LENS_R) / ADS_ZOOM  = 134
-        #   lens_right_yard = (_LENS_CX + _LENS_R) / ADS_ZOOM  = 378
-        #   lens_top_yard   = (_LENS_CY - _LENS_R - yr.top) / ADS_ZOOM = 10
-        #   lens_bot_yard   = (_LENS_CY + _LENS_R - yr.top) / ADS_ZOOM = 254
-        vp_x_min = yr.left  - int((_LENS_CX - _LENS_R - yr.left) / ADS_ZOOM)
-        vp_x_max = yr.right - int((_LENS_CX + _LENS_R - yr.left) / ADS_ZOOM)
-        vp_y_min = yr.top   - int((_LENS_CY - _LENS_R - yr.top)  / ADS_ZOOM)
-        vp_y_max = yr.bottom - int((_LENS_CY + _LENS_R - yr.top) / ADS_ZOOM)
-        tx = max(0.0, min(mx / max(SCREEN_WIDTH - 1, 1), 1.0))
-        ty = max(0.0, min((my - yr.top) / max(yr.height - 1, 1), 1.0))
-        vp_x = vp_x_min + int(tx * (vp_x_max - vp_x_min))
-        vp_y = vp_y_min + int(ty * (vp_y_max - vp_y_min))
+        vp_x, vp_y, vp_w, vp_h = ads_viewport(
+            mx, my, yr.left, yr.top, yr.width, yr.height,
+            SCREEN_WIDTH, ADS_ZOOM, _LENS_CX, _LENS_CY, _LENS_R,
+        )
         return pygame.Rect(vp_x, vp_y, vp_w, vp_h)
 
     def _get_vp_surf(self, vp_rect: pygame.Rect) -> pygame.Surface:
@@ -160,13 +143,14 @@ class YardState(BaseState):
 
     def _raccoon_in_lens(self, raccoon) -> bool:
         """True if the raccoon circle is fully inside the ADS lens circle."""
+        from src.states.yard_logic import raccoon_in_lens
         yr = self._yard_rect
-        vp_rect = self._ads_viewport()
+        vp = self._ads_viewport()
         rx, ry = raccoon.yard_pos
-        sx = yr.left + (rx - vp_rect.x) * ADS_ZOOM
-        sy = yr.top + (ry - vp_rect.y) * ADS_ZOOM
-        dist = ((sx - _LENS_CX) ** 2 + (sy - _LENS_CY) ** 2) ** 0.5
-        return dist + raccoon.radius * ADS_ZOOM <= _LENS_R
+        return raccoon_in_lens(
+            rx, ry, raccoon.radius, vp.x, vp.y,
+            yr.left, yr.top, ADS_ZOOM, _LENS_CX, _LENS_CY, _LENS_R,
+        )
 
     def _take_photo(self):
         photo = self._capture_photo()
@@ -235,7 +219,7 @@ class YardState(BaseState):
 
         if self.time_remaining <= 0:
             self.time_remaining = 0
-            self.game.change_state("result", score=0, fled=False,
+            self.game.change_state("result", score=0,
                                    timeout=True, zone_index=self.zone_index)
 
     # ------------------------------------------------------------------

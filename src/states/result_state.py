@@ -34,12 +34,12 @@ class ResultState(BaseState):
             self._advance()
 
     def _advance(self):
-        if self.game.timer_remaining <= 0:
-            self.game.change_state("game_over")
-        elif self.game.score >= self.game.level_config.score_target:
-            self.game.change_state("level_complete")
-        else:
-            self.game.change_state("camera", exclude_zone=self.zone_index)
+        from src.states.result_logic import decide_next_state
+        state, kwargs = decide_next_state(
+            self.game.timer_remaining, self.game.score,
+            self.game.level_config.score_target, self.zone_index,
+        )
+        self.game.change_state(state, **kwargs)
 
     def update(self, dt):
         self.display_timer += dt
